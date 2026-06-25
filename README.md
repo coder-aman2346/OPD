@@ -15,11 +15,11 @@ An AI-powered healthcare assistant that collects patient symptoms through conver
   ChatService  AppointmentSvc  MetricsSvc
        │
        ├── GuardrailService (PII + Injection + Safety)
-       ├── MemoryService (PostgreSQL + Summarization)
-       └── LLMService (OpenAI GPT-4o-mini)
+       ├── MemoryService (SQLite/PostgreSQL + Summarization)
+       └── LLMService (Gemini 2.5 Flash)
                      │
                      ▼
-               PostgreSQL
+               SQLite / PostgreSQL
 ```
 
 ### Tech Stack
@@ -27,30 +27,48 @@ An AI-powered healthcare assistant that collects patient symptoms through conver
 | Component | Technology |
 |---|---|
 | Backend | FastAPI (Python 3.11) |
-| LLM | GPT-4o-mini (OpenAI SDK) |
-| Database | PostgreSQL 16 |
+| LLM | Gemini 2.5 Flash (via OpenAI Compatibility SDK) |
+| Database | SQLite (Local) / PostgreSQL |
 | Frontend | React (Vite) |
-| Containerization | Docker Compose |
+| Containerization | Docker Compose (Optional) |
 
 ## Quick Start
 
+### 1. Clone the repository
 ```bash
-# 1. Clone the repository
 git clone <repo-url>
 cd ai-healthcare-assistant
-
-# 2. Add your OpenAI API key
-# Edit the .env file and replace 'your-api-key-here' with your actual key
-nano .env
-
-# 3. Run the application
-docker compose up --build
-
-# 4. Open the UI
-# Frontend: http://localhost:5173
-# Backend API: http://localhost:8000
-# API Docs: http://localhost:8000/docs
 ```
+
+### 2. Configure Environment Variables
+Copy the `.env.example` file to `.env` and add your Gemini API key:
+```bash
+cp .env.example .env
+# Edit .env and replace YOUR_GEMINI_API_KEY_HERE with your actual key
+```
+
+### 3. Run Locally (Without Docker)
+
+**Backend (FastAPI):**
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Or .\.venv\Scripts\activate on Windows
+pip install -r requirements.txt
+python -m uvicorn app.main:app --port 8000 --reload
+```
+
+**Frontend (React/Vite):**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The UI will be available at `http://localhost:5173` and the backend API at `http://localhost:8000`.
+
+### 4. Database Access
+By default, the application uses a local SQLite database located at `backend/healthcare.db`. You can view it using any SQLite viewer (like the "SQLite Viewer" VS Code extension or DB Browser for SQLite).
 
 ## Prompting Strategy
 
@@ -77,7 +95,7 @@ Doctor-facing summaries are generated inline by the LLM when booking appointment
 
 ## Memory Implementation
 
-1. **Full Persistence**: Every message (user, assistant, tool) is stored in PostgreSQL
+1. **Full Persistence**: Every message (user, assistant, tool) is stored in the database.
 2. **Running Summary**: When conversation exceeds 20 messages, older messages are summarized via LLM and stored as a `conversation_summary`
 3. **Context Window**: The LLM receives the summary (if exists) + last 10 messages, keeping the context window manageable
 4. **Compaction**: After summarization, older messages are deleted from the messages table
@@ -111,7 +129,7 @@ Doctor-facing summaries are generated inline by the LLM when booking appointment
 - Total requests and appointments
 - Average latency and TTFT
 - Total token usage across all categories
-- Estimated cost (based on GPT-4o-mini pricing)
+- Estimated cost (based on Gemini API pricing)
 
 ### Conversation Tracing
 - Unique request ID per HTTP request (returned in `X-Request-ID` header)
@@ -135,18 +153,16 @@ All parameters are configurable via environment variables in `.env`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | — | Your OpenAI API key |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Model to use |
-| `OPENAI_TEMPERATURE` | `0.3` | Response randomness |
-| `OPENAI_MAX_TOKENS` | `1024` | Max response tokens |
-| `OPENAI_FREQUENCY_PENALTY` | `0.0` | Frequency penalty |
+| `GEMINI_API_KEY` | — | Your Gemini API key |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Model to use |
+| `GEMINI_API_BASE` | `https://generativelanguage.googleapis.com/v1beta/openai/` | OpenAI Compatibility Layer Base URL |
 
 ## Trade-offs
 
 | Decision | Rationale |
 |---|---|
-| **OpenAI SDK** over LangChain | Simpler, fewer abstractions, direct control over prompts and tool calling |
-| **PostgreSQL** for memory | Persistent, queryable, supports the conversation + summary pattern well |
+| **Gemini via OpenAI SDK** over native SDK | Simpler, uses existing OpenAI abstractions, direct control over prompts and tool calling |
+| **SQLite / PostgreSQL** for memory | Persistent, queryable, supports the conversation + summary pattern well |
 | **Strict mode** tool calling | Ensures structured, validated outputs from the LLM |
 | **Regex-based** guardrails | Fast, no additional API calls; reasonable for the scope |
 | **In-memory** metrics | Sufficient for single-instance; avoids adding Redis/Prometheus complexity |
@@ -186,6 +202,7 @@ pytest -v
 │   ├── Dockerfile
 │   └── package.json
 ├── docker-compose.yml
-├── .env
+├── .env.example
+├── .gitignore
 └── README.md
 ```
