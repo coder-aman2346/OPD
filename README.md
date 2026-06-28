@@ -37,7 +37,7 @@ An AI-powered healthcare assistant that collects patient symptoms through conver
 ### 1. Clone the repository
 ```bash
 git clone <repo-url>
-cd ai-healthcare-assistant
+cd opd
 ```
 
 ### 2. Configure Environment Variables
